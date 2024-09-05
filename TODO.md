@@ -23,15 +23,15 @@
 
 ##### Float to Decimal
 -1. Determine precision
-0. Special values
- - 0
- - infinity
- - denormalized
- - NaN
 1. Break binary
  - sign
  - exponent
  - mantissa
+1a. Special values
+ - 0
+ - infinity
+ - denormalized
+ - NaN
 2. Add first 1 in mantissa
 3. Remove exponent bias
 5. Shift point

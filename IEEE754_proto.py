@@ -162,6 +162,30 @@ def float_to_decimal(binary):
 	if debug:
 		print("Debug: PRE:", PRE)
 
+	# splitting binary
+	sig = binary[0]
+	exp = binary[1:1+EXP]
+	man = binary[1+EXP:]
+	if debug:
+		print("Debug: sig:", sig)
+		print("Debug: exp:", exp)
+		print("Debug: man:", man)
+
+	# special values
+	if exp == '0' * EXP:		# exponent is all 0s
+		if man == '0' * MAN:	# mantissa is all 0s
+			return 0.0
+		else:					# arbitary mantissa
+			return "Denormalized"
+	elif exp == '1' * EXP:		# exponent is all 1s
+		if man == '0' * MAN:	# mantissa is all 0s
+			result = "Inf"
+			if sig == '1':
+				result = '-' + result
+			return result
+		else:					# arbitary mantissa
+			return "NaN"
+
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
 	print("IEEE 754 Decimal <-> Float Converter\nPrototype v2");
@@ -211,5 +235,16 @@ if __name__ == "__main__":
 	"""
 
 	# testing float to decimal
-	print()
-	float_to_decimal("01000010010111001000000000000000");
+	test_numbers = ["00000000000000000000000000000000", "10000000001010101010101000111100", "01111111100000000000000000000000", "11111111100000000000000000000000", "01111111101010101010101000111100"]
+	solutions = [0.0, "Denormalized", "Inf", "-Inf", "NaN"];
+	n = len(test_numbers);
+	for i in range(n):
+		print("\n---------------------------------------------------------------------------\n");
+		result = float_to_decimal(test_numbers[i]);
+		print(f"\nResult: {result}");
+		print(f"Answer: {solutions[i]}");
+		if result == solutions[i]:
+			print("Correct!");
+		else:
+			print("Incorrect!");
+	
