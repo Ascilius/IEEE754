@@ -1,167 +1,215 @@
 from math import log2
 from random import random
+import struct
 
-debug = True
+debug = True;
 
 # ---------------------------------------------------------------------------
-def front_trim(binary):
-	# finding first 1
-	i = binary.index('1');
+# decimal to float
 
-def to_sci_not(binary, exponent): # binary string with decimal point
-	i = binary.index('.');
-	front = binary[:i];
-	back = binary[i+1:];
-	sci_not = front[0] + '.' + front[1:] + back + " x 2^" + str(exponent);
-	return sci_not;
+def print_binary(binary_struct):
+	binary = binary_struct[0];
+	exponent = binary_struct[1];
+
+	# regular
+	if exponent > (len(binary) - 1): # binary point is far right of manitssa
+		print(binary + ('0' * (exponent - (len(binary) - 1))) + ".0");
+	elif exponent < 0: # binary point is far left of mantissa
+		print("0." + ('0' * abs(exponent + 1)) + binary);
+	else: # binary point is within mantissa
+		print(binary[:1+exponent] + '.' + binary[1+exponent:]);
+
+	# scientific notation
+	print(binary[0] + '.' + binary[1:] + " x 2^" + str(exponent));
+
+def get_binary_exponent(num):
+	exp = int(log2(num));
+	if 0 < num and num < 1:
+		exp -= 1;
+	if debug:
+		print("Debug: exp =", exp);
+		print("Debug: 2^exp =", 2**exp);
+	return exp;
+
+# TOFIX
+def round_binary(binary):
+	"""
+	if binary[i] == '0':
+		binary = binary[:-1]
+	elif binary[i] == '1':
+	"""
+	i = -1;
+	while True:
+		i -= 1;
+		if binary[i] == '0':
+			binary = binary[:i] + '1' + binary[i+1:];
+			break;
+		elif binary[i] == '1':
+			binary = binary[:i] + '0' + binary[i+1:];
+	return binary[:-1];
+
+def decimal_to_binary(num, LIM):
+	LIM += 2; # +1 for removing first 1, +1 for rounding
+	print(f"Converting {num} to binary...");
+
+	exp = get_binary_exponent(num);
+	i = exp + 1;
+	rem = num;
+	bits = 0;
+	binary = ''
+	while rem != 0 and bits < LIM:
+		i -= 1;
+
+		sub = 2**i;
+		if sub > rem:
+			binary += '0'
+		else:
+			rem -= sub;
+			binary += '1'
+		bits += 1;
+
+		if debug:
+			print(f"Debug: i = {i}; binary = {binary} ({bits})");
+	# adding remaining 0s
+	while i > 0:
+		i -= 1;
+		binary += '0';
+
+	# roundin
+	if len(binary) == LIM:
+		binary = round_binary(binary);
+
+	return [binary, exp];
 
 def decimal_to_float(num, pre):
+	print(f"Converting {num} to {pre}-precision float...");
+
 	# determining precision
-	if pre == 's':
-		PRE = "Single"
-		LEN = 32
+	if pre == "single":
 		EXP = 8
 		MAN = 23
 		BIA = 127
-	elif pre == 'd':
-		PRE = "Double"
-		LEN = 64
+	elif pre == "double":
 		EXP = 11
 		MAN = 52
 		BIA = 1023
-	print(PRE + ' precision selected:')
 	if debug:
-		print("Debug: LEN =", LEN)
-		print("Debug: EXP =", EXP)
-		print("Debug: MAN =", MAN)
-		print("Debug: BIA =", BIA)
-	print()
+		print("Debug: EXP =", EXP);
+		print("Debug: MAN =", MAN);
+		print("Debug: BIA =", BIA);
+
+	# special value (0)
+	if num == 0:
+		binary = '0' * 32;
+		return binary;
 
 	# determining sign
-	if num >= 0:
-		sig = '0'
+	if num >= 0.0:
+		sign = '0'; # positive
 	else:
-		sig = '1'
-	print("Sign: " + sig + '\n')
+		sign = '1'; # negative
+	if debug:
+		print("\nDebug: sign = " + sign);
 
-	# converting to binary
-	i = int(log2(abs(num)))
-	rem = abs(num)
-	bits = 0
-	binary = ''
-	binary_added = False;
-	while rem != 0:
-		# break when max bits reached
-		if bits >= MAN + 1:
-			break
-		bits += 1
-		
-		# calculating next bit
-		sub = 2**i
-		if sub <= rem:
-			rem -= sub
-			binary += '1'
-		else:
-			binary += '0'
-		
-		# debug info
-		if debug:
-			print(f"Debug: i = {i}")	
-			print(f"Debug: rem = {rem}")
-			print(f"Debug: bits = {bits}")
-			print("Debug: binary = " + binary)
-			input()
-		
-		# adding decimal point
-		if i <= 0 and not binary_added:
-			binary += '.'
-			binary_added = True;
-		
-		# next bit
-		i -= 1
+	# converting num to binary
+	print();
+	binary_struct = decimal_to_binary(abs(num), MAN);
+	if debug:
+		print("Debug: binary:");
+		print_binary(binary_struct);
 
-	print("Binary: " + binary)
+	# adding bias and converting to binary
+	exponent = binary_struct[1] + BIA;
+	if debug:
+		print("\nDebug: exponent + bias =", exponent);
+	exponent_binary = decimal_to_binary(exponent, EXP)[0];
+	if debug:
+		print("Debug: exponent binary:", exponent_binary);
 
-	# shifting binary point (TODO)
-	if binary[0] == '1':
-		exp = binary.index('.') - 1
-	elif binary[0] == '0': # -1.0 < num < 1.0
-		exp = 1 - binary.index('1')
-	print(f"Exponent: {exp}")
-	print(f"Scientific Notation: {to_sci_not(binary, exp)}\n")
+	# adding 0s to front of exponent
+	while len(exponent_binary) < EXP:
+		exponent_binary = '0' + exponent_binary;
+	# removing first 1 and adding 0s to back of mantissa
+	mantissa_binary = binary_struct[0][1:];
+	while len(mantissa_binary) < MAN:
+		mantissa_binary += '0'
+	if debug:
+		print(f"\nDebug: exponent_binary: {exponent_binary} ({len(exponent_binary)})");
+		print(f"Debug: mantissa_binary: {mantissa_binary} ({len(mantissa_binary)})");
+
+	# assembling float structure
+	result = sign + exponent_binary + mantissa_binary;
+	return result;
 
 # ---------------------------------------------------------------------------
-def float_to_decimal(): # TOFIX
-	# user input
-	if debug:
-		precision = 'Single'
-	else:
-		precision = input('Precision (Single/Double): ')
-	if precision == 'Single':
-		LEN = 32
+# float to decimal
+
+def float_to_decimal(binary):
+	print(f"Converting {binary} to decimal...");
+
+	# determining precision
+	length = len(binary)
+	if length == 32:
+		PRE = "single"
 		EXP = 8
 		MAN = 23
 		BIA = 127
-	elif precision == 'Double':
-		LEN = 64
+	elif length == 64:
+		PRE = "double"
 		EXP = 11
 		MAN = 52
 		BIA = 1023
-	print(precision + ' precision selected:')
-
-	# generating random number
-	binary = ''
-	for i in range(LEN):
-		if random() < 0.5:
-			binary += '0'
-		else:
-			binary += '1'
-	print(binary)
-
-	# separating binary
-	sig_str = binary[0]
-	sep = 1 + EXP
-	exp_str = binary[1:sep]
-	man_str = binary[sep:]
-	print('\n' + sig_str + '\n ' + exp_str + '\n' + (' ' * sep) + man_str + '\n')
-
-	# determining sign
-	if sig_str == '0':
-		sig_str = '+'
-	elif sig_str == '1':
-		sig_str = '-'
-	print('Sign: ' + sig_str + '\n')
-
-	# determining exponent
-	exp_num = 0
-	for i in range(EXP):
-		if exp_str[i] == '1':
-			bit = 2**(EXP - i - 1)
-			if debug:
-				print(f'Debug: exp_str[{i}] -> {bit}')
-			exp_num += bit
 	if debug:
-		print('Debug: Exponent + Bias: ' + str(exp_num))
-	exp_num -= BIA
-	print('Exponent: ' + str(exp_num))
-
-	# determining mantissa
-	if debug:
-		print('Debug: Adjusted mantissa: ' + man_str[0] + '.' + man_str[1:] + ' x 2^' + str(exp_num))
-		if exp_num >= 0:
-			rem = exp_num - MAN + 1
-			print('Debug: rem =', rem)
-			if rem >= 0:
-				print("0b" + man_str + ('0' * rem) + '.0')
-			else:
-				print("0b" + man_str[:MAN+rem] + '.' + man_str[MAN+rem:])
-		else:
-			print("0b0." + ('0' * (abs(exp_num) - 1)) + man_str)
+		print("Debug: PRE:", PRE)
 
 # ---------------------------------------------------------------------------
-
 if __name__ == "__main__":
-	decimal_to_float(-42.625, 's')
-	# decimal_to_float(0.625, 's')
-	# decimal_to_float(1.0, 's')
-	decimal_to_float(0.0001, 's')
+	print("IEEE 754 Decimal <-> Float Converter\nPrototype v2");
+
+	# testing decimal to float
+	
+	"""
+	test_numbers = [-42.625, 69.420, 0.0, 1.0, 0.999, 0.000123, 1000000];
+	solutions = ["11000010001010101000000000000000", "01000010100010101101011100001010", "00000000000000000000000000000000", "00111111100000000000000000000000", "00111111011111111011111001110111", "00111001000000001111100110010000", "01001001011101000010010000000000"]
+	n = len(test_numbers);
+	for i in range(n):
+		print("\n---------------------------------------------------------------------------\n");
+		result = decimal_to_float(test_numbers[i], 'single');
+		print(f"\nResult: {result} ({len(result)})");
+		print(f"Answer: {solutions[i]}");
+		if result == solutions[i]:
+			print("Correct!");
+		else:
+			print("Incorrect!");
+	"""
+
+	"""
+	i = 0;
+	score = 0.0;
+	while True:
+		print("\n---------------------------------------------------------------------------\n");
+		i += 1
+		print(f"{i} ({round(score / i * 100)}%);")
+
+		# https://www.slingacademy.com/article/python-how-to-convert-a-float-to-binary/
+		scale = 1000000
+		number = random() * scale - (scale / 2)
+		
+		result = decimal_to_float(number, "single")
+		print("\nResult: " + result)
+
+		s = struct.pack('!f', number)
+		b = ''.join(format(c, '08b') for c in s)
+		print("Answer: " + b)
+		
+		if result == b:
+			print('\033[92m' + "Correct!" + '\033[0m')
+			score += 1;
+		else:
+			print('\033[91m' + "Incorrect!" + '\033[0m')
+			input()
+	"""
+
+	# testing float to decimal
+	print()
+	float_to_decimal("01000010010111001000000000000000");
